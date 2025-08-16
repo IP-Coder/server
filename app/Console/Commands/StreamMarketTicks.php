@@ -17,6 +17,7 @@ class StreamMarketTicks extends Command
 
     public function handle()
     {
+
         $symbols      = $this->option('symbol') ?: ['NASDAQ:AAPL'];
         $wsApiKey     = config('services.insightsentry.wskey');
         $wsUrl        = 'wss://realtime.insightsentry.com/live';
@@ -27,7 +28,7 @@ class StreamMarketTicks extends Command
         }, $symbols);
 
         $attempts = 0;
-
+        set_time_limit(0);
         while (true) {
             $client = null;
 
@@ -61,7 +62,7 @@ class StreamMarketTicks extends Command
                     'subscriptions' => $subscriptions,
                 ]));
                 $this->info("Subscribed to: " . implode(', ', $symbols));
-
+                $client->setTimeout(0);
                 $lastPing = time();
 
                 // ————— Streaming loop —————
@@ -85,7 +86,7 @@ class StreamMarketTicks extends Command
                         continue;
                     }
 
-                    $this->info("Raw: {$message}");
+                    // $this->info("Raw: {$message}");
                     $data = json_decode($message, true);
                     if (json_last_error() !== JSON_ERROR_NONE) {
                         $this->warn("Invalid JSON: {$message}");
@@ -101,7 +102,7 @@ class StreamMarketTicks extends Command
                             (float) ($data['ask_size'] ?? 0),
                             (float) ($data['bid_size'] ?? 0)
                         ));
-                        $this->line("Quote: {$data['code']} - Bid: {$data['bid']} Ask: {$data['ask']}");
+                        // $this->line("Quote: {$data['code']} - Bid: {$data['bid']} Ask: {$data['ask']}");
                     } elseif (isset($data['code'], $data['last_price'])) {
                         event(new MarketPriceUpdate(
                             $data['code'],
@@ -110,7 +111,7 @@ class StreamMarketTicks extends Command
                             (float) ($data['change'] ?? 0),
                             (float) ($data['change_percent'] ?? 0)
                         ));
-                        $this->line("Price Update: {$data['code']} - Last Price: {$data['last_price']}");
+                        // $this->line("Price Update: {$data['code']} - Last Price: {$data['last_price']}");
                     } elseif (isset($data['series'])) {
                         $this->info("Series data for {$data['code']}");
                     } elseif (isset($data['message'])) {

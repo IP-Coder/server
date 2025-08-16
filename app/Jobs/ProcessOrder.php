@@ -37,11 +37,7 @@ class ProcessOrder implements ShouldQueue
 
             // 1) Market order vs pending
             if ($d['order_type'] === 'market') {
-                // fetch live quote
-                $quote = $market->fetchOne($d['symbol']);
-                $price = $d['side'] === 'buy'
-                    ? $quote['data'][0]['ask']
-                    : $quote['data'][0]['bid'];
+                $price = $d['open_price']; // ✅ Use frontend-sent price only
 
                 // margin calc
                 $spec           = Instrument::where('symbol', $d['symbol'])->first();
@@ -50,7 +46,6 @@ class ProcessOrder implements ShouldQueue
                 $marginRequired = $notional / $d['leverage'];
 
                 if ($acct->balance < $marginRequired) {
-                    // mark failed
                     $order->update([
                         'status'  => 'failed',
                         'message' => 'Insufficient margin',
@@ -58,7 +53,6 @@ class ProcessOrder implements ShouldQueue
                     return;
                 }
 
-                // update the order record
                 $order->update([
                     'open_price'      => $price,
                     'margin_required' => $marginRequired,
@@ -66,13 +60,17 @@ class ProcessOrder implements ShouldQueue
                     'open_time'       => now(),
                 ]);
 
-                // adjust account
                 $acct->decrement('balance', $marginRequired);
                 $acct->increment('used_margin', $marginRequired);
             } else {
-                // limit/stop: stay pending until external trigger or cron
-                $order->update(['status' => 'pending']);
+                // ✅ pending order (limit/stop) with trigger_price from frontend
+                $order->update([
+                    'price' => $d['trigger_price'] ?? null,
+                    'expiry' => $d['expiry'] ?? null,
+                    'status' => 'pending',
+                ]);
             }
+
 
             // Broadcast that the order has been processed (open or pending or failed)
             // broadcast(new OrderProcessed($order->fresh()));

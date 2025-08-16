@@ -117,11 +117,13 @@ class OrderController extends Controller
             'order_type'        => 'required|in:market,limit,stop',
             'volume'            => 'required|numeric|min:0.01',
             'leverage'          => 'required|integer|min:1',
+            'open_price'        => 'required_if:order_type,market|numeric',
             'stop_loss_price'   => 'nullable|numeric',
             'take_profit_price' => 'nullable|numeric',
             'trigger_price'     => 'nullable|numeric',
             'expiry'            => 'nullable|date',
         ]);
+
 
         $user = $request->user();
         $acct = $user->tradingAccount;
@@ -166,31 +168,37 @@ class OrderController extends Controller
         $status && $q->where('status', $status);
         $orders = $q->latest()->get();
 
-        $out = [];
-        foreach ($orders as $o) {
-            $arr = $o->toArray();
-            // if ($o->status === 'open') {
-            //     $quote = $this->market->fetchOne($o->symbol);
-            //     Log:
-            //     info($quote['data'][0]['bid']);
-            //     $live  = $o->type === 'buy' ? $quote['data'][0]['bid'] : $quote['data'][0]['ask'];
-            //     $arr['live_price']           = $live;
-            //     $arr['floating_profit_loss'] = $this->calculatePL(
-            //         $o->type,
-            //         $o->open_price,
-            //         $live,
-            //         $o->volume
-            //     );
-            // }
-            $out[] = $arr;
-        }
+        // $out = [];
+        // foreach ($orders as $o) {
+        //     $arr = $o->toArray();
+        //     if ($o->status === 'open') {
+        //         $quote = $this->market->fetchOne($o->symbol);
+        //         Log:
+        //         info($quote['data'][0]['bid']);
+        //         $live  = $o->type === 'buy' ? $quote['data'][0]['bid'] : $quote['data'][0]['ask'];
+        //         $arr['live_price']           = $live;
+        //         $arr['floating_profit_loss'] = $this->calculatePL(
+        //             $o->type,
+        //             $o->open_price,
+        //             $live,
+        //             $o->volume
+        //         );
+        //     }
+        //     $out[] = $arr;
+        // }
 
-        return response()->json(['status' => 'success', 'orders' => $out]);
+        return response()->json(['status' => 'success', 'orders' => $orders]);
     }
 
     public function closeOrder(Request $request)
     {
-        $v = $request->validate(['order_id' => 'required|int|exists:orders,id']);
+        $v = $request->validate([
+            'order_id' => 'required|int|exists:orders,id',
+            'close_price' => 'required|numeric',
+            'profit_loss' => 'required|numeric',
+            'volume' => 'nullable|numeric|min:0.01',
+        ]);
+
         $user  = $request->user();
         $order = $user->orders()
             ->where('id', $v['order_id'])
@@ -204,24 +212,31 @@ class OrderController extends Controller
             ], 404);
         }
 
-        $quote      = $this->market->fetchOne($order->symbol);
-        $closePrice = $order->type === 'buy' ? $quote['data'][0]['bid'] : $quote['data'][0]['ask'];
-        $pl         = $this->calculatePL($order->type, $order->open_price, $closePrice, $order->volume);
+        $closePrice = $v['close_price'];
+        $pl         = $v['profit_loss'];
+        $closeVolume = $v['volume'] ?? $order->volume;
 
+        // Handle full close
         $order->update([
             'close_price' => $closePrice,
             'close_time' => now(),
             'profit_loss' => $pl,
+            'volume' => $closeVolume,
             'status' => 'closed',
         ]);
 
         $acct = $user->tradingAccount;
         $acct->decrement('used_margin', $order->margin_required);
         $acct->increment('balance', $order->margin_required + $pl);
+
         broadcast(new AccountUpdated($acct));
 
-        return response()->json(['status' => 'success', 'order' => $order]);
+        return response()->json([
+            'status' => 'success',
+            'order' => $order,
+        ]);
     }
+
 
     public function updateSlTp(Request $request, Order $order)
     {
