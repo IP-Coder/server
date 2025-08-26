@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'mobile',
     ];
 
     /**
@@ -61,7 +62,7 @@ class User extends Authenticatable
 
     public function tradingAccount()
     {
-        return $this->hasOne(\App\Models\TradingAccount::class);
+        return $this->hasOne(\App\Models\TradingAccount::class, 'user_id');
     }
 
     public function orders()

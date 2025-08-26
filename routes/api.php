@@ -8,6 +8,10 @@ use App\Http\Controllers\MarketController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\TradeController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\TransactionController;
+
 // Public
 
 // Protected
@@ -40,4 +44,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'orders']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/order/close', [OrderController::class, 'closeOrder']);
+    // Profile
+    Route::get('/me', [UserController::class, 'me']);
+    Route::post('/user/update', [UserController::class, 'update']);
+
+    // Transactions
+    Route::post('/transactions/create', [TransactionController::class, 'create']);
+    Route::get('/transactions/my', [TransactionController::class, 'myTransactions']);
+});
+Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
+    Route::get('/users', [AdminController::class, 'listUsers']);
+    Route::get('/users/{id}/account', [AdminController::class, 'userAccount']);
+    Route::get('/users', [AdminController::class, 'listUsers']);
+    Route::get('/users/{id}/trades', [AdminController::class, 'userTrades']);
+    Route::get('/users/{id}/transactions', [TransactionController::class, 'userTransactions']); // ✅ add this
+    Route::post('/trades/{id}/close', [AdminController::class, 'closeTrade']);
+    Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
 });

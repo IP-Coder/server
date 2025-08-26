@@ -5,7 +5,7 @@
 namespace App\Events;
 
 use App\Models\TradingAccount;
-use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
 class AccountUpdated implements ShouldBroadcastNow
@@ -20,7 +20,7 @@ class AccountUpdated implements ShouldBroadcastNow
     public function broadcastOn()
     {
         // private channel scoped to this user
-        return new PrivateChannel("account.{$this->account->user_id}");
+        return new Channel("account.{$this->account->user_id}");
     }
 
     public function broadcastWith()
