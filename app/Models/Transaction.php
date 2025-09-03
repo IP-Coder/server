@@ -16,15 +16,6 @@ class Transaction extends Model
         'address',
         'receipt_path',
         'method',
-        'bank_name',
-        'beneficiary_city',
-        'beneficiary_name',
-        'bank_address',
-        'account_iban',
-        'country',
-        'routing_number',
-        'swift',
-        'comment',
     ];
 
     protected $casts = [
