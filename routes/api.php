@@ -49,8 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/update', [UserController::class, 'update']);
 
     // Transactions
-    Route::post('/transactions/create', [TransactionController::class, 'create']);
-    Route::get('/transactions/my', [TransactionController::class, 'myTransactions']);
+    Route::post('/transactions/create', [TransactionController::class, 'store']);
+    Route::get('/transactions/my',     [TransactionController::class, 'my']);
 });
 Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users', [AdminController::class, 'listUsers']);

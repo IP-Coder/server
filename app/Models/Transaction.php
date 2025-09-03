@@ -2,22 +2,32 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Transaction extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
         'type',
         'amount',
         'status',
+        'currency',
+        'chain',
+        'address',
+        'receipt_path',
+        'method',
+        'bank_name',
+        'beneficiary_city',
+        'beneficiary_name',
+        'bank_address',
+        'account_iban',
+        'country',
+        'routing_number',
+        'swift',
+        'comment',
     ];
 
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+    protected $casts = [
+        'amount' => 'decimal:2',
+    ];
 }

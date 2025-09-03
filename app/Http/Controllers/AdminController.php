@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\Order;
 use App\Models\TradingAccount;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use App\Events\AccountUpdated;
 
 class AdminController extends Controller
 {
@@ -45,12 +47,56 @@ class AdminController extends Controller
         ]);
     }
 
-    public function closeTrade($orderId): JsonResponse
-    {
-        $order = Order::findOrFail($orderId);
-        $order->status = 'closed';
-        $order->save();
+    // public function closeTrade($orderId): JsonResponse
+    // {
+    //     $order = Order::findOrFail($orderId);
+    //     $order->status = 'closed';
+    //     $order->save();
 
-        return response()->json(['message' => 'Trade closed', 'order' => $order]);
+    //     return response()->json(['message' => 'Trade closed', 'order' => $order]);
+    // }
+    public function closeTrade(Request $request, $orderId): JsonResponse
+    {
+        $v = $request->validate([
+            'close_price' => 'required|numeric',
+            'profit_loss' => 'required|numeric',
+            'volume' => 'nullable|numeric|min:0.01',
+        ]);
+
+        $order = Order::where('id', $orderId)
+            ->where('status', 'open')
+            ->first();
+
+        if (! $order) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Order not found or already closed.'
+            ], 404);
+        }
+
+        $closePrice  = $v['close_price'];
+        $pl          = $v['profit_loss'];
+        $closeVolume = $v['volume'] ?? $order->volume;
+
+        // Update order
+        $order->update([
+            'close_price' => $closePrice,
+            'close_time'  => now(),
+            'profit_loss' => $pl,
+            'volume'      => $closeVolume,
+            'status'      => 'closed',
+        ]);
+
+        // Update account
+        $acct = $order->user->tradingAccount;
+        $acct->decrement('used_margin', $order->margin_required);
+        $acct->increment('balance', $order->margin_required + $pl);
+
+        broadcast(new AccountUpdated($acct));
+
+        return response()->json([
+            'status' => 'success',
+            'order'  => $order,
+        ]);
     }
 }
