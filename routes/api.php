@@ -45,8 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/order/close', [OrderController::class, 'closeOrder']);
     // Profile
-    Route::get('/me', [UserController::class, 'me']);
-    Route::post('/user/update', [UserController::class, 'update']);
+    Route::get('/me',                 [UserController::class, 'me']);
+    Route::post('/user/update',       [UserController::class, 'update']);
+    Route::post('/user/change-password', [UserController::class, 'changePassword']);
 
     // Transactions
     Route::post('/transactions/create', [TransactionController::class, 'store']);
