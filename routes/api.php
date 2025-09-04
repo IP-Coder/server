@@ -11,6 +11,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\SupportController;
 
 // Public
 
@@ -30,7 +31,6 @@ Route::post('/login',  [AuthController::class, 'login']);
 Route::get('/login',  [AuthController::class, 'login']);
 Route::get('/ohlc', [OrderController::class, 'ohlc']); // or a new controller if you prefer
 Route::get('/symbols', [OrderController::class, 'symbols']);
-
 Route::get('/convert', [OrderController::class, 'convert']);
 
 // Route::get('/quote', [QuoteController::class, 'getQuote']);
@@ -44,6 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'orders']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/order/close', [OrderController::class, 'closeOrder']);
+    Route::post('/support/tickets', [SupportController::class, 'store']);
+    Route::get('/support/tickets/my', [SupportController::class, 'my']);
     // Profile
     Route::get('/me',                 [UserController::class, 'me']);
     Route::post('/user/update',       [UserController::class, 'update']);

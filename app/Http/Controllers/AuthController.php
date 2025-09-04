@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Models\TradingAccount;
+use App\Models\Transaction;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -16,23 +20,50 @@ class AuthController extends Controller
     public function signup(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
+            'name'                 => 'required|string|max:255',
+            'email'                => 'required|email|unique:users,email',
+            'password'             => 'required|string|min:8|confirmed',
+            'account_type'         => ['required', Rule::in(['demo', 'live'])],
         ]);
 
+        $DEMO_CREDIT = 100000.00; // 1 lakh
+
+        $result = DB::transaction(function () use ($data, $DEMO_CREDIT) {
         $user = User::create([
             'name'     => $data['name'],
             'email'    => $data['email'],
             'password' => Hash::make($data['password']),
         ]);
 
-        $token = $user->createToken('api_token')->plainTextToken;
+            $isDemo = $data['account_type'] === 'demo';
+            $initial = $isDemo ? $DEMO_CREDIT : 0.00;
 
-        return response()->json([
-            'user'  => $user,
-            'token' => $token,
-        ], 201);
+            $account = TradingAccount::create([
+                'user_id'          => $user->id,
+                'account_currency' => 'USD', // change if you want INR
+                'balance'          => $initial,
+                'equity'           => $initial,
+                'used_margin'      => 0.00,
+            ]);
+
+            if ($isDemo) {
+                Transaction::create([
+                    'user_id'  => $user->id,
+                    'type'     => 'deposit',
+                    'amount'   => $DEMO_CREDIT,
+                    'currency' => 'USD',
+                    'method'   => 'demo-credit',
+                    'comment'  => 'Signup demo bonus',
+                    'status'   => 'approved',
+                ]);
+            }
+
+            $token = $user->createToken('api_token')->plainTextToken;
+
+            return compact('user', 'account', 'token');
+        });
+
+        return response()->json($result, 201);
     }
 
     /**

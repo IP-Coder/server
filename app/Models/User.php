@@ -62,17 +62,17 @@ class User extends Authenticatable
         ];
     }
     // In app/Models/User.php, inside the User class:
-    protected static function booted()
-    {
-        static::created(function ($user) {
-            $user->tradingAccount()->create([
-                'account_currency' => 'USD',
-                'balance' => 50000.00,
-                'equity' => 50000.00,
-                'used_margin' => 0.00,
-            ]);
-        });
-    }
+    // protected static function booted()
+    // {
+    //     static::created(function ($user) {
+    //         $user->tradingAccount()->create([
+    //             'account_currency' => 'USD',
+    //             'balance' => 50000.00,
+    //             'equity' => 50000.00,
+    //             'used_margin' => 0.00,
+    //         ]);
+    //     });
+    // }
 
     public function tradingAccount()
     {

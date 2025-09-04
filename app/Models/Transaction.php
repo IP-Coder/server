@@ -10,12 +10,13 @@ class Transaction extends Model
         'user_id',
         'type',
         'amount',
-        'status',
         'currency',
         'chain',
         'address',
         'receipt_path',
         'method',
+        'comment',
+        'status',
     ];
 
     protected $casts = [
