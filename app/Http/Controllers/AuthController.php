@@ -33,6 +33,7 @@ class AuthController extends Controller
             'name'     => $data['name'],
             'email'    => $data['email'],
             'password' => Hash::make($data['password']),
+                'account_type'      => $data['account_type'],
         ]);
 
             $isDemo = $data['account_type'] === 'demo';
