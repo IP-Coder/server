@@ -20,6 +20,10 @@ class Symbol extends Model
         'quote_symbol',
         'quote_title',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'last_price',
+        'bid',
+        'ask',
+        'last_quote_at',
     ];
 }
