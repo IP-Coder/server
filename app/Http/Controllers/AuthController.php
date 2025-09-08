@@ -11,6 +11,7 @@ use App\Models\TradingAccount;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Models\Affiliate;
 
 class AuthController extends Controller
 {
@@ -24,6 +25,7 @@ class AuthController extends Controller
             'email'                => 'required|email|unique:users,email',
             'password'             => 'required|string|min:8|confirmed',
             'account_type'         => ['required', Rule::in(['demo', 'live'])],
+            'referral_code'        => 'nullable|string|max:50', // optional
         ]);
 
         $DEMO_CREDIT = 100000.00; // 1 lakh
@@ -35,6 +37,20 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
                 'account_type'      => $data['account_type'],
         ]);
+            if (!empty($data['referral_code'])) {
+                $rewardAmount = 10.0; // referral reward amount
+                $referrer = User::where('referral_code', $data['referral_code'])->first();
+                if ($referrer && $referrer->id !== $user->id) {
+                    // a) link who referred (if your users table has referred_by)
+                    $user->referred_by = $referrer->id;
+                    $user->save();
+                    // b) ledger entry (affiliates table)
+                    Affiliate::firstOrCreate(
+                        ['user_id' => $referrer->id, 'referred_user_id' => $user->id],
+                        ['reward_amount' => $rewardAmount]
+                    );
+                }
+            }
 
             $isDemo = $data['account_type'] === 'demo';
             $initial = $isDemo ? $DEMO_CREDIT : 0.00;

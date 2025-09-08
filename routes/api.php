@@ -12,6 +12,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\SupportController;
+use App\Http\Controllers\ReferralController;
 
 // Public
 
@@ -54,6 +55,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Transactions
     Route::post('/transactions/create', [TransactionController::class, 'store']);
     Route::get('/transactions/my',     [TransactionController::class, 'my']);
+    //referral system
+    Route::get('/refer/my', [ReferralController::class, 'my']);
+    Route::get('/refer/history', [ReferralController::class, 'history']);
+
+    Route::post('/user/switch-to-live', [UserController::class, 'switchToLive']);
 });
 Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users', [AdminController::class, 'listUsers']);

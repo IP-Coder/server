@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+
+use App\Models\Order;
+use App\Models\TradingAccount;
 
 class UserController extends Controller
 {
@@ -21,8 +25,6 @@ class UserController extends Controller
             'email2'        => $u->email2,
             'mobile'        => $u->mobile,       // primary phone
             'phone_code'    => $u->phone_code,
-            'phone2'        => $u->phone2,
-            'phone2_code'   => $u->phone2_code,
             'first_name'    => $u->first_name,
             'last_name'     => $u->last_name,
             'birth_day'     => $u->birth_day,
@@ -49,10 +51,7 @@ class UserController extends Controller
             'email'         => ['required','email','max:255', Rule::unique('users','email')->ignore($u->id)],
             'email2'        => ['nullable','email','max:255'],
             'phone_code'    => ['nullable','string','max:10'],
-            'mobile'        => ['nullable','string','max:30'],     // primary phone
-            'phone2_code'   => ['nullable','string','max:10'],
-            'phone2'        => ['nullable','string','max:30'],
-
+            'mobile'        => ['nullable', 'string', 'max:30'],     // primary phone
             // personal
             'first_name'    => ['nullable','string','max:100'],
             'last_name'     => ['nullable','string','max:100'],
@@ -96,7 +95,49 @@ class UserController extends Controller
             'message' => 'Profile updated.',
         ]);
     }
+    public function switchToLive(Request $request)
+    {
+        $u = $request->user();
 
+        if ($u->account_type === 'live') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is already LIVE.'
+            ], 409);
+        }
+
+        DB::transaction(function () use ($u) {
+            // 1) delete all orders/trades for this user
+            Order::where('user_id', $u->id)->delete();
+
+            // 2) reset trading account to 0
+            $ta = $u->tradingAccount()->first();
+            if ($ta) {
+                $ta->balance = 0;
+                $ta->equity = 0;
+                $ta->used_margin = 0;
+                $ta->save();
+            } else {
+                // if somehow missing, create a fresh zeroed account
+                $u->tradingAccount()->create([
+                    'account_currency' => 'USD',
+                    'balance' => 0,
+                    'equity'  => 0,
+                    'used_margin' => 0,
+                ]);
+            }
+
+            // 3) flip account type to live
+            $u->account_type = 'live';
+            $u->save();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Switched to LIVE. All demo trades deleted and account reset to 0.',
+            'account_type' => 'live',
+        ]);
+    }
     /** POST /user/change-password */
     public function changePassword(Request $request)
     {
@@ -120,5 +161,18 @@ class UserController extends Controller
         $u->save();
 
         return response()->json(['success' => true, 'message' => 'Password changed.']);
+    }
+    public function myReferral(Request $req)
+    {
+        $u = $req->user();
+        $svc = app(\App\Services\ReferralService::class);
+        $code = $svc->codeFor($u);
+
+        $q = \App\Models\Affiliate::where('user_id', $u->id);
+        return response()->json([
+            'code' => $code,
+            'referred_count' => (clone $q)->count(),
+            'total_reward'   => (float)(clone $q)->sum('reward_amount'),
+        ]);
     }
 }
