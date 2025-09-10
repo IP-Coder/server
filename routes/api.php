@@ -2,10 +2,9 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MarketController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\MarketController;
 use App\Http\Controllers\TradeController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\AdminController;
@@ -13,6 +12,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\KycController;
 
 // Public
 
@@ -30,7 +30,7 @@ use App\Http\Controllers\ReferralController;
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/login',  [AuthController::class, 'login']);
 Route::get('/login',  [AuthController::class, 'login']);
-Route::get('/ohlc', [OrderController::class, 'ohlc']); // or a new controller if you prefer
+Route::get('/ohlc', [OrderController::class, 'ohlc']);
 Route::get('/symbols', [OrderController::class, 'symbols']);
 Route::get('/convert', [OrderController::class, 'convert']);
 
@@ -51,22 +51,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',                 [UserController::class, 'me']);
     Route::post('/user/update',       [UserController::class, 'update']);
     Route::post('/user/change-password', [UserController::class, 'changePassword']);
-
     // Transactions
     Route::post('/transactions/create', [TransactionController::class, 'store']);
     Route::get('/transactions/my',     [TransactionController::class, 'my']);
     //referral system
     Route::get('/refer/my', [ReferralController::class, 'my']);
     Route::get('/refer/history', [ReferralController::class, 'history']);
-
     Route::post('/user/switch-to-live', [UserController::class, 'switchToLive']);
+    // KYC
+    Route::get('/kyc/my', [KycController::class, 'my']);
+    Route::post('/kyc/submit', [KycController::class, 'submit']);
 });
 Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users', [AdminController::class, 'listUsers']);
     Route::get('/users/{id}/account', [AdminController::class, 'userAccount']);
     Route::get('/users', [AdminController::class, 'listUsers']);
     Route::get('/users/{id}/trades', [AdminController::class, 'userTrades']);
-    Route::get('/users/{id}/transactions', [TransactionController::class, 'userTransactions']); // ✅ add this
+    Route::get('/users/{id}/transactions', [TransactionController::class, 'userTransactions']);
     Route::post('/trades/{id}/close', [AdminController::class, 'closeTrade']);
     Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
 });
