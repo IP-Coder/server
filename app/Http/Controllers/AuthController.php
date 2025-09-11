@@ -38,7 +38,7 @@ class AuthController extends Controller
                 'account_type'      => $data['account_type'],
         ]);
             if (!empty($data['referral_code'])) {
-                $rewardAmount = 10.0; // referral reward amount
+                $rewardAmount = 0.0; // referral reward amount
                 $referrer = User::where('referral_code', $data['referral_code'])->first();
                 if ($referrer && $referrer->id !== $user->id) {
                     // a) link who referred (if your users table has referred_by)

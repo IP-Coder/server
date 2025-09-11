@@ -11,8 +11,10 @@ use App\Models\Instrument;
 use App\Events\AccountUpdated;
 use App\Services\MarketService;
 use App\Jobs\ProcessOrder; // ← our new Job
+use App\Support\ApiResponses;
 class OrderController extends Controller
 {
+    use ApiResponses;
     public function __construct(protected MarketService $market) {}
 
     public function account()
@@ -109,6 +111,56 @@ class OrderController extends Controller
 
 
 
+    // public function placeOrder(Request $request)
+    // {
+    //     $data = $request->validate([
+    //         'symbol'            => 'required|string',
+    //         'side'              => 'required|in:buy,sell',
+    //         'order_type'        => 'required|in:market,limit,stop',
+    //         'volume'            => 'required|numeric|min:0.01',
+    //         'leverage'          => 'required|integer|min:1',
+    //         'open_price'        => 'required_if:order_type,market|numeric',
+    //         'stop_loss_price'   => 'nullable|numeric',
+    //         'take_profit_price' => 'nullable|numeric',
+    //         'trigger_price'     => 'nullable|numeric',
+    //         'expiry'            => 'nullable|date',
+    //     ]);
+
+
+    //     $user = $request->user();
+    //     $acct = $user->tradingAccount;
+
+    //     // create a placeholder order with minimal data & status “queued”
+    //     $order = $acct->orders()->create([
+    //         'user_id'            => $user->id,
+    //         'trading_account_id' => $acct->id,
+    //         'symbol'             => $data['symbol'],
+    //         'type'               => $data['side'],
+    //         'volume'             => $data['volume'],
+    //         'leverage'           => $data['leverage'],
+    //         'order_type'         => $data['order_type'],
+    //         'stop_loss_price'    => $data['stop_loss_price'],
+    //         'take_profit_price'  => $data['take_profit_price'],
+    //         'price'              => $data['trigger_price'] ?? null,
+    //         'expiry'             => $data['expiry'] ?? null,
+    //         // these will be filled in the Job
+    //         'open_price'         => null,
+    //         'status'             => 'pending',
+    //         'margin_required'    => null,
+    //         'open_time'          => null,
+    //     ]);
+
+    //     // dispatch a Job to do the real work
+    //     ProcessOrder::dispatch($order->id, $data);
+
+    //     // return immediately
+    //     return response()->json([
+    //         'status'  => 'success',
+    //         'message' => 'Order received, processing…',
+    //         'data'    => ['order_id' => $order->id, 'status' => 'queued'],
+    //     ]);
+    // }
+
     public function placeOrder(Request $request)
     {
         $data = $request->validate([
@@ -117,47 +169,108 @@ class OrderController extends Controller
             'order_type'        => 'required|in:market,limit,stop',
             'volume'            => 'required|numeric|min:0.01',
             'leverage'          => 'required|integer|min:1',
-            'open_price'        => 'required_if:order_type,market|numeric',
-            'stop_loss_price'   => 'nullable|numeric',
-            'take_profit_price' => 'nullable|numeric',
-            'trigger_price'     => 'nullable|numeric',
+
+            // Make sure the job will have what it needs:
+            'open_price'        => 'required_if:order_type,market|numeric|gt:0',
+            'trigger_price'     => 'required_if:order_type,limit,stop|nullable|numeric|gt:0',
+
+            'stop_loss_price'   => 'nullable|numeric|gt:0',
+            'take_profit_price' => 'nullable|numeric|gt:0',
             'expiry'            => 'nullable|date',
         ]);
-
 
         $user = $request->user();
         $acct = $user->tradingAccount;
 
-        // create a placeholder order with minimal data & status “queued”
+        // 1) Trading params
+        $instrument = Instrument::where('symbol', $data['symbol'])->first();
+        if (! $instrument) {
+            return $this->fail('SYMBOL_UNKNOWN', 'Symbol is not tradable.');
+        }
+
+        // 2) Volume validation against instrument spec
+        $vol  = (float) $data['volume'];
+        $step = (float) $instrument->volume_step;
+        $minV = (float) $instrument->min_volume;
+        $maxV = (float) $instrument->max_volume;
+
+        if ($vol < $minV || $vol > $maxV) {
+            return $this->fail(
+                'VOLUME_OUT_OF_RANGE',
+                "Volume must be between {$minV} and {$maxV}.",
+                ['requested' => $vol, 'min' => $minV, 'max' => $maxV]
+            );
+        }
+        // guard for step (with small epsilon for floats)
+        if (fmod(($vol - $minV) + 1e-12, $step) > 1e-8) {
+            return $this->fail(
+                'VOLUME_STEP_INVALID',
+                "Volume must be in steps of {$step}.",
+                ['requested' => $vol, 'step' => $step]
+            );
+        }
+
+        // 3) Price (server-side) — useful for margin pre-check & logging
+        //    If you cache quotes in the DB, you could read from there instead.
+        $quote  = $this->market->fetchOne($data['symbol']); // must return bid/ask
+        $market = $data['side'] === 'buy' ? $quote['data'][0]['ask'] : $quote['data'][0]['bid'];
+
+        // 4) Margin pre-flight (use price * volume * contract_size / leverage)
+        $contractSize   = (float) $instrument->contract_size;
+        $leverage       = max(1, (int) $data['leverage']);
+        $requiredMargin = round(($market * $vol * $contractSize) / $leverage, 2);
+
+        // prefer equity if you track it; otherwise derive free margin from balance-used_margin
+        $equity     = (float) ($acct->equity ?? ($acct->balance ?? 0));
+        $usedMargin = (float) ($acct->used_margin ?? 0);
+        $freeMargin = max(0, $equity - $usedMargin);
+
+        if ($requiredMargin > $freeMargin) {
+            return $this->fail(
+                'INSUFFICIENT_MARGIN',
+                'Margin is less than required.',
+                [
+                    'required_margin' => $requiredMargin,
+                    'free_margin'     => $freeMargin,
+                    'equity'          => $equity,
+                    'used_margin'     => $usedMargin,
+                    'leverage'        => $leverage,
+                    'price'           => $market,
+                ]
+            );
+        }
+
+        // 5) Create placeholder order (pending locally; job will finalize/open/fail)
         $order = $acct->orders()->create([
             'user_id'            => $user->id,
             'trading_account_id' => $acct->id,
             'symbol'             => $data['symbol'],
             'type'               => $data['side'],
-            'volume'             => $data['volume'],
-            'leverage'           => $data['leverage'],
+            'volume'             => $vol,
+            'leverage'           => $leverage,
             'order_type'         => $data['order_type'],
-            'stop_loss_price'    => $data['stop_loss_price'],
-            'take_profit_price'  => $data['take_profit_price'],
-            'price'              => $data['trigger_price'] ?? null,
+            'stop_loss_price'    => $data['stop_loss_price'] ?? null,
+            'take_profit_price'  => $data['take_profit_price'] ?? null,
+            'price'              => $data['trigger_price'] ?? null, // pending price
             'expiry'             => $data['expiry'] ?? null,
-            // these will be filled in the Job
-            'open_price'         => null,
             'status'             => 'pending',
-            'margin_required'    => null,
-            'open_time'          => null,
         ]);
 
-        // dispatch a Job to do the real work
-        ProcessOrder::dispatch($order->id, $data);
+        // 6) Dispatch job with everything it needs (include server pre-check info too)
+        ProcessOrder::dispatch($order->id, array_merge($data, [
+            'preflight_price'           => $market,
+            'preflight_margin_required' => $requiredMargin,
+        ]));
 
-        // return immediately
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Order received, processing…',
-            'data'    => ['order_id' => $order->id, 'status' => 'queued'],
-        ]);
+        // 7) Immediate, informative response
+        return $this->ok('ORDER PLACED', 'Order Placed Successfully', [
+            'order_id'        => $order->id,
+            'status'          => 'open',
+            'price_checked'   => $market,
+            'margin_required' => $requiredMargin,
+        ], 202);
     }
+
 
 
     public function orders(Request $request)

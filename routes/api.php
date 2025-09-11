@@ -36,15 +36,18 @@ Route::get('/convert', [OrderController::class, 'convert']);
 
 // Route::get('/quote', [QuoteController::class, 'getQuote']);
 Route::middleware('auth:sanctum')->group(function () {
+    //OrderController
     Route::patch('/order/{order}/sl-tp', [OrderController::class, 'updateSlTp']);
-    Route::get('/favorites', [FavoriteController::class, 'index']);
-    Route::post('/favorites', [FavoriteController::class, 'store']);
-    Route::delete('/favorites/{symbol}', [FavoriteController::class, 'destroy']);
     Route::get('/account', [OrderController::class, 'account']);
     Route::post('/place', [OrderController::class, 'placeOrder']);
     Route::get('/orders', [OrderController::class, 'orders']);
-    Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/order/close', [OrderController::class, 'closeOrder']);
+    //AuthController
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::post('/favorites', [FavoriteController::class, 'store']);
+    Route::delete('/favorites/{symbol}', [FavoriteController::class, 'destroy']);
+    //SupportController
     Route::post('/support/tickets', [SupportController::class, 'store']);
     Route::get('/support/tickets/my', [SupportController::class, 'my']);
     // Profile
@@ -67,7 +70,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users/{id}/account', [AdminController::class, 'userAccount']);
     Route::get('/users', [AdminController::class, 'listUsers']);
     Route::get('/users/{id}/trades', [AdminController::class, 'userTrades']);
-    Route::get('/users/{id}/transactions', [TransactionController::class, 'userTransactions']);
+    Route::get('/users/{id}/transactions', [TransactionController::class, 'my']);
     Route::post('/trades/{id}/close', [AdminController::class, 'closeTrade']);
     Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
 });

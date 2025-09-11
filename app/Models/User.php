@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens; // ← Add this
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -72,6 +73,18 @@ class User extends Authenticatable
     //         ]);
     //     });
     // }
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user) {
+            if (empty($user->referral_code)) {
+                do {
+                    $code = strtoupper(Str::random(8));
+                } while (self::where('referral_code', $code)->exists());
+                $user->referral_code = $code;
+            }
+        });
+    }
 
     public function tradingAccount()
     {

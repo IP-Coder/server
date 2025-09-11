@@ -6,9 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Order;
 use App\Models\Instrument;
-use App\Events\OrderProcessed;
 use App\Events\AccountUpdated;
-use App\Services\MarketService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,32 +25,52 @@ class ProcessOrder implements ShouldQueue
         $this->data    = $data;
     }
 
-    public function handle(MarketService $market)
+    public function handle()
     {
-        // Wrap in a transaction to keep balances & order in sync
-        DB::transaction(function () use ($market) {
-            $order = Order::lockForUpdate()->find($this->orderId);
+        DB::transaction(function () {
+            /** @var Order $order */
+            $order = Order::lockForUpdate()->findOrFail($this->orderId);
             $acct  = $order->tradingAccount;
             $d     = $this->data;
 
-            // 1) Market order vs pending
+            $instrument    = Instrument::where('symbol', $d['symbol'])->first();
+            $contractSize  = (float) ($instrument?->contract_size ?? 100000);
+            $volume        = (float) $d['volume'];
+            $leverage      = max(1, (int) $d['leverage']);
+
             if ($d['order_type'] === 'market') {
-                $price = $d['open_price']; // ✅ Use frontend-sent price only
+                // Use front-end sent open_price for execution; fall back to server pre-check if needed
+                $price = isset($d['open_price']) && $d['open_price'] > 0
+                    ? (float) $d['open_price']
+                    : (float) ($d['preflight_price'] ?? 0);
 
-                // margin calc
-                $spec           = Instrument::where('symbol', $d['symbol'])->first();
-                $contractSize   = $spec?->contract_size ?: 100_000;
-                $notional       = $d['volume'] * $contractSize;
-                $marginRequired = $notional / $d['leverage'];
-
-                if ($acct->balance < $marginRequired) {
+                if ($price <= 0) {
                     $order->update([
                         'status'  => 'failed',
-                        'message' => 'Insufficient margin',
+                        'message' => 'Missing execution price',
                     ]);
+                    broadcast(new AccountUpdated($acct->refresh()));
                     return;
                 }
 
+                // Margin required = price * volume * contract_size / leverage
+                $marginRequired = round(($price * $volume * $contractSize) / $leverage, 2);
+
+                // Compute free margin (prefer equity if tracked)
+                $equity     = (float) ($acct->equity ?? ($acct->balance ?? 0));
+                $usedMargin = (float) ($acct->used_margin ?? 0);
+                $freeMargin = max(0, $equity - $usedMargin);
+
+                if ($marginRequired > $freeMargin) {
+                    $order->update([
+                        'status'  => 'failed',
+                        'message' => 'INSUFFICIENT_MARGIN',
+                    ]);
+                    broadcast(new AccountUpdated($acct->refresh()));
+                    return;
+                }
+
+                // Open the order
                 $order->update([
                     'open_price'      => $price,
                     'margin_required' => $marginRequired,
@@ -60,23 +78,25 @@ class ProcessOrder implements ShouldQueue
                     'open_time'       => now(),
                 ]);
 
-                $acct->decrement('balance', $marginRequired);
+                // Margin booking:
+                // Recommended: DO NOT decrease balance on open; only increase used_margin.
                 $acct->increment('used_margin', $marginRequired);
+
+                // If your accounting model decrements balance at open, uncomment the next line
+                // $acct->decrement('balance', $marginRequired);
             } else {
-                // ✅ pending order (limit/stop) with trigger_price from frontend
+                // Limit/Stop (pending). The controller already put trigger price & expiry on the order,
+                // but we ensure here as well in case of retries.
                 $order->update([
-                    'price' => $d['trigger_price'] ?? null,
-                    'expiry' => $d['expiry'] ?? null,
+                    'price'  => $d['trigger_price'] ?? $order->price,
+                    'expiry' => $d['expiry'] ?? $order->expiry,
                     'status' => 'pending',
                 ]);
             }
 
-
-            // Broadcast that the order has been processed (open or pending or failed)
-            // broadcast(new OrderProcessed($order->fresh()));
-
-            // Also broadcast updated account balances
+            // Broadcast updated account (and order if you have an event for it)
             broadcast(new AccountUpdated($acct->refresh()));
+            // event(new OrderProcessed($order->fresh())); // if you use this event
         });
     }
 }
