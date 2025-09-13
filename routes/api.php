@@ -70,7 +70,9 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users/{id}/account', [AdminController::class, 'userAccount']);
     Route::get('/users', [AdminController::class, 'listUsers']);
     Route::get('/users/{id}/trades', [AdminController::class, 'userTrades']);
-    Route::get('/users/{id}/transactions', [TransactionController::class, 'my']);
     Route::post('/trades/{id}/close', [AdminController::class, 'closeTrade']);
-    Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
+    // Route::get('/users/{id}/transactions', [TransactionController::class, 'admintransections']);
+    // Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
+    Route::get('/users/{id}/transactions', [AdminController::class, 'userTransactions']);
+    Route::post('/transactions/{id}/status', [AdminController::class, 'updateTransactionStatus']);
 });

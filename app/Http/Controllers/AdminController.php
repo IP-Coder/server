@@ -8,6 +8,10 @@ use App\Models\TradingAccount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Events\AccountUpdated;
+use App\Models\Transaction;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -97,6 +101,124 @@ class AdminController extends Controller
         return response()->json([
             'status' => 'success',
             'order'  => $order,
+        ]);
+    }
+    /**
+     * GET /api/users/{id}/transactions  (admin only)
+     * Return the user’s transactions for the admin UI.
+     */
+    public function userTransactions(int $id): \Illuminate\Http\JsonResponse
+    {
+        // Ensure the user exists (and eager-load if you prefer)
+        $user = \App\Models\User::findOrFail($id);
+
+        $txs = Transaction::where('user_id', $id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (Transaction $t) {
+                return [
+                    'id'          => $t->id,
+                    'type'        => $t->type,           // 'deposit' | 'withdrawal'
+                    'amount'      => (float)$t->amount,
+                    'status'      => $t->status,         // 'pending' | 'approved' | 'rejected'
+                    'currency'    => $t->currency,
+                    'chain'       => $t->chain,
+                    'address'     => $t->address,
+                    'method'      => $t->method,
+                    'receipt_url' => $receiptUrl = $t->receipt_path ? asset('storage/' . ltrim($t->receipt_path, '/')) : null,
+                    'created_at'  => optional($t->created_at)->toIso8601String(),
+                    'updated_at'  => optional($t->updated_at)->toIso8601String(),
+                ];
+            });
+
+        return response()->json(['transactions' => $txs]);
+    }
+
+    /**
+     * POST /api/transactions/{id}/status  (admin only)
+     * Body: { "status": "approved" | "rejected" }
+     *
+     * - Approving a DEPOSIT increases account balance.
+     * - Approving a WITHDRAWAL decreases account balance (checks sufficient balance).
+     * - Rejecting does not touch balance.
+     * - Idempotent: if already processed with same status, no double-apply.
+     */
+    public function updateTransactionStatus(Request $request, int $id): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['approved', 'rejected'])],
+        ]);
+
+        /** @var Transaction $tx */
+        $tx = Transaction::with('user.tradingAccount')->findOrFail($id);
+
+        // Only pending can be processed
+        if ($tx->status !== 'pending') {
+            if ($tx->status === $data['status']) {
+                return response()->json([
+                    'status'  => 'ok',
+                    'message' => 'Transaction already processed.',
+                ]);
+            }
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Only pending transactions can be updated.',
+            ], 422);
+        }
+
+        // Must have a trading account to post balance effects
+        $acct = optional($tx->user)->tradingAccount;
+        if (!$acct) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Trading account not found for this user.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($data, $tx, $acct) {
+            $new = $data['status'];
+
+            if ($new === 'approved') {
+                if ($tx->type === 'deposit') {
+                    // Credit balance
+                    $acct->increment('balance', $tx->amount);
+                    $acct->increment('equity',  $tx->amount);
+                } elseif ($tx->type === 'withdrawal') {
+                    // Ensure sufficient funds (simple guard)
+                    if ($acct->balance < $tx->amount) {
+                        // Throwing will rollback
+                        throw new \RuntimeException('Insufficient balance to approve withdrawal.');
+                    }
+                    // Debit balance
+                    $acct->decrement('balance', $tx->amount);
+                    $acct->decrement('equity',  $tx->amount);
+                }
+            }
+
+            // Persist transaction status
+            $tx->status = $new;
+            $tx->save();
+
+            // Optional: broadcast account update if you already use this elsewhere
+            if (class_exists(\App\Events\AccountUpdated::class)) {
+                broadcast(new \App\Events\AccountUpdated($acct));
+            }
+        });
+
+        // Reload fresh state
+        $tx->refresh();
+        $acct->refresh();
+
+        return response()->json([
+            'status'       => 'success',
+            'transaction'  => [
+                'id'     => $tx->id,
+                'status' => $tx->status,
+            ],
+            'account'      => [
+                'balance' => (float)$acct->balance,
+                'equity'  => (float)$acct->equity,
+            ],
         ]);
     }
 }
