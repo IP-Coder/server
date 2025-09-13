@@ -169,11 +169,9 @@ class OrderController extends Controller
             'order_type'        => 'required|in:market,limit,stop',
             'volume'            => 'required|numeric|min:0.01',
             'leverage'          => 'required|integer|min:1',
-
             // Make sure the job will have what it needs:
             'open_price'        => 'required_if:order_type,market|numeric|gt:0',
             'trigger_price'     => 'required_if:order_type,limit,stop|nullable|numeric|gt:0',
-
             'stop_loss_price'   => 'nullable|numeric|gt:0',
             'take_profit_price' => 'nullable|numeric|gt:0',
             'expiry'            => 'nullable|date',
@@ -212,8 +210,9 @@ class OrderController extends Controller
 
         // 3) Price (server-side) — useful for margin pre-check & logging
         //    If you cache quotes in the DB, you could read from there instead.
-        $quote  = $this->market->fetchOne($data['symbol']); // must return bid/ask
-        $market = $data['side'] === 'buy' ? $quote['data'][0]['ask'] : $quote['data'][0]['bid'];
+        // $quote  = $this->market->fetchOne($data['symbol']); // must return bid/ask
+        // $market = $data['side'] === 'buy' ? $quote['data'][0]['ask'] : $quote['data'][0]['bid'];
+        $market = $data['open_price']; // front-end provided (required if market order)
 
         // 4) Margin pre-flight (use price * volume * contract_size / leverage)
         $contractSize   = (float) $instrument->contract_size;

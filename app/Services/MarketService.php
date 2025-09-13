@@ -45,14 +45,22 @@ class MarketService
      */
     public function fetchOne(string $symbol): array
     {
+        // Agar symbol BTCUSDT ya ETHUSDT hai to BINANCE otherwise OANDA
+        $prefix = in_array($symbol, ['BTCUSDT', 'ETHUSDT']) ? 'BINANCE' : 'OANDA';
+
+        $code = "{$prefix}:{$symbol}";
+
         Log:
-        info("{$this->baseUrl}/v2/symbols/quotes?codes=OANDA:{$symbol}");
+        info("{$this->baseUrl}/v2/symbols/quotes?codes={$code}");
+
+
         return Http::withHeaders($this->headers)
             ->retry(3, 100)
-            ->get("{$this->baseUrl}/v2/symbols/quotes?codes=OANDA:{$symbol}")
+            ->get("{$this->baseUrl}/v2/symbols/quotes?codes={$code}")
             ->throw()
             ->json();
     }
+
     public function fetchOHLC(string $symbol, int $interval, int $periods): array
     {
         return Http::withHeaders($this->headers)
