@@ -32,31 +32,30 @@ class KycController extends Controller
     public function submit(Request $req)
     {
         $req->validate([
-            'aadhaar_number' => ['required', 'regex:/^\d{12}$/'],
-            'document' => ['required', 'file', 'image', 'max:8192'], // 8 MB
-            'selfie'   => ['required', 'file', 'image', 'max:8192'],
+            // Aadhaar ki jagah ab koi bhi National ID chalega
+            'aadhaar_number' => ['required', 'regex:/^[A-Za-z0-9]{6,20}$/'],
+            'document'       => ['required', 'file', 'image', 'max:8192'],
+            'selfie'         => ['nullable', 'file', 'image', 'max:8192'],
         ]);
 
         $user = $req->user();
-
         $dir = "kyc/{$user->id}";
+
         $docPath = $req->file('document')->storePublicly($dir, 'public');
-        $selfiePath = $req->file('selfie')->storePublicly($dir, 'public');
+        $selfiePath = $req->hasFile('selfie')
+            ? $req->file('selfie')->storePublicly($dir, 'public')
+            : null;
 
-        $aadhaar = $req->input('aadhaar_number');
+        $idNumber = $req->input('aadhaar_number');
+
         $sub = KycSubmission::create([
-            'user_id' => $user->id,
-            'aadhaar_hash' => hash('sha256', $aadhaar),
-            'aadhaar_last4' => substr($aadhaar, -4),
-            'document_path' => $docPath,
-            'selfie_path'   => $selfiePath,
-            'status' => 'pending',
+            'user_id'         => $user->id,
+            'id_number_hash'  => hash('sha256', $idNumber),
+            'id_number_last4' => substr($idNumber, -4),
+            'document_path'   => $docPath,
+            'selfie_path'     => $selfiePath,
+            'status'          => 'pending',
         ]);
-
-        return response()->json([
-            'message' => 'KYC submitted successfully.',
-            'id' => $sub->id,
-        ], 201);
     }
 
     // Optional: admin review endpoint(s) can be added later
