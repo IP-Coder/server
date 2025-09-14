@@ -17,11 +17,17 @@ use App\Models\KycSubmission; // ⬅️ NEW
 
 class AdminController extends Controller
 {
-    public function listUsers(): JsonResponse
+    public function listUsers(Request $request): JsonResponse
     {
-        $users = User::with('tradingAccount:id,user_id,balance,equity,used_margin')
-            ->select('id', 'name', 'email')
-            ->get();
+        $query = User::with('tradingAccount:id,user_id,account_currency,balance,equity,used_margin')
+            ->select('id', 'name', 'email', 'mobile', 'account_type'); // ⬅️ add these
+
+        // Optional: only_live=1 dene par sirf LIVE users bhejo
+        if ($request->boolean('only_live')) {
+            $query->where('account_type', 'live');
+        }
+
+        $users = $query->get();
 
         return response()->json(['users' => $users]);
     }
