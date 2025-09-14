@@ -12,6 +12,8 @@ use App\Models\Transaction;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use App\Models\KycSubmission; // ⬅️ NEW
+
 
 class AdminController extends Controller
 {
@@ -218,6 +220,54 @@ class AdminController extends Controller
             'account'      => [
                 'balance' => (float)$acct->balance,
                 'equity'  => (float)$acct->equity,
+            ],
+        ]);
+    }
+    public function userKyc(int $id): JsonResponse
+    {
+        $user = \App\Models\User::findOrFail($id);
+
+        $subs = KycSubmission::where('user_id', $id)
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'id'               => $s->id,
+                    'status'           => $s->status,
+                    'id_number_last4'  => $s->id_number_last4,
+                    'document_url'     => $s->document_path ? asset('storage/' . ltrim($s->document_path, '/')) : null,
+                    'selfie_url'       => $s->selfie_path ? asset('storage/' . ltrim($s->selfie_path, '/')) : null,
+                    'review_notes'     => $s->review_notes,
+                    'created_at'       => optional($s->created_at)->toIso8601String(),
+                    'updated_at'       => optional($s->updated_at)->toIso8601String(),
+                ];
+            });
+
+        return response()->json(['kyc' => $subs]);
+    }
+
+    /**
+     * POST /api/kyc/{id}/status (admin)
+     * Body: { "status": "approved" | "rejected", "notes": "..." }
+     */
+    public function updateKycStatus(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['approved', 'rejected'])],
+            'notes'  => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $kyc = KycSubmission::findOrFail($id);
+        $kyc->status = $data['status'];
+        $kyc->review_notes = $data['notes'] ?? null;
+        $kyc->save();
+
+        return response()->json([
+            'status' => 'success',
+            'kyc'    => [
+                'id'           => $kyc->id,
+                'status'       => $kyc->status,
+                'review_notes' => $kyc->review_notes,
             ],
         ]);
     }

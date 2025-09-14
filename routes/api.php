@@ -75,4 +75,8 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     // Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
     Route::get('/users/{id}/transactions', [AdminController::class, 'userTransactions']);
     Route::post('/transactions/{id}/status', [AdminController::class, 'updateTransactionStatus']);
+
+    // ⬇️ NEW: Admin KYC endpoints
+    Route::get('/users/{id}/kyc', [AdminController::class, 'userKyc']);
+    Route::post('/kyc/{id}/status', [AdminController::class, 'updateKycStatus']);
 });
