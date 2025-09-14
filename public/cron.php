@@ -35,7 +35,6 @@ $codes = [
     "OANDA:NZDCAD",
     "OANDA:NZDJPY",
     "OANDA:NZDUSD",
-    "OANDA:USDCAD",
     "OANDA:USDCNH",
     "OANDA:USDDKK",
     "OANDA:USDHUF",
@@ -44,7 +43,7 @@ $codes = [
     "OANDA:USDNOK",
     "OANDA:USDSEK",
     "OANDA:USDZAR",
-    "BINANCE:BTCUSDT",
+    "BINANCE:BTCUSD.P",
     "BINANCE:ETHUSDT",
     "OANDA:XAUUSD",
     "OANDA:XAGUSD",
@@ -59,10 +58,10 @@ $CHUNK_SIZE = 10;          // RapidAPI hard limit
 $SLEEP_BETWEEN_CHUNKS = 1; // seconds (rate-limit ke liye)
 
 // ====== DB CREDS ======
-$dbHost = 'localhost';
-$dbName = 'broker_db';
-$dbUser = 'root';
-$dbPass = '';
+$dbHost = '127.0.0.1';
+$dbName = 'brokerdb';
+$dbUser = 'brokerdb';
+$dbPass = 'Nextinera@9044';
 
 // ====== DB CONNECT ======
 try {
@@ -76,13 +75,9 @@ try {
 
 // UPSERT stmt (sirf teen fields)
 $up = $pdo->prepare("
-INSERT INTO symbols (symbol, last_price, bid, ask, last_quote_at)
-VALUES (:symbol, :last_price, :bid, :ask, NOW())
-ON DUPLICATE KEY UPDATE
-  last_price = VALUES(last_price),
-  bid        = VALUES(bid),
-  ask        = VALUES(ask),
-  last_quote_at = NOW()
+UPDATE symbols 
+SET last_price = :last_price, bid = :bid, ask = :ask, last_quote_at = NOW()
+WHERE symbol = :symbol;
 ");
 
 // ====== Helpers ======
