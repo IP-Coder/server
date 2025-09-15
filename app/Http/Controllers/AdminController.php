@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use App\Models\KycSubmission; // ⬅️ NEW
+use App\Models\SupportTicket; // ⬅️ NEW
 
 
 class AdminController extends Controller
@@ -276,5 +277,85 @@ class AdminController extends Controller
                 'review_notes' => $kyc->review_notes,
             ],
         ]);
+    }
+    public function supportTickets(Request $request): JsonResponse
+    {
+        $status = $request->query('status'); // optional: open|pending|closed|resolved
+        $q      = $request->query('q');      // optional search (ticket_no, subject, message, email)
+
+        $tickets = SupportTicket::with('user:id,name,email')
+            ->when($status, fn($qq) => $qq->where('status', $status))
+            ->when($q, function ($qq) use ($q) {
+                $qq->where(function ($w) use ($q) {
+                    $w->where('ticket_no', 'like', "%{$q}%")
+                        ->orWhere('subject', 'like', "%{$q}%")
+                        ->orWhere('message', 'like', "%{$q}%")
+                        ->orWhere('email', 'like', "%{$q}%");
+                });
+            })
+            ->orderByDesc('created_at')
+            ->limit(500) // simple cap; swap to paginate() if you prefer
+            ->get()
+            ->map(function (SupportTicket $t) {
+                return [
+                    'id'         => $t->id,
+                    'ticket_no'  => $t->ticket_no,
+                    'subject'    => $t->subject,
+                    'status'     => $t->status,
+                    'name'       => $t->name,
+                    'email'      => $t->email,
+                    'phone'      => trim(($t->phone_code ? "+{$t->phone_code} " : '') . $t->phone),
+                    'message'    => $t->message,
+                    'attachments' => $t->attachments,
+                    'source'     => $t->source,
+                    'created_at' => optional($t->created_at)->toIso8601String(),
+                    'user'       => $t->user ? [
+                        'id'    => $t->user->id,
+                        'name'  => $t->user->name,
+                        'email' => $t->user->email,
+                    ] : null,
+                ];
+            });
+
+        return response()->json(['tickets' => $tickets]);
+    }
+
+    public function supportTicketShow(int $id): JsonResponse
+    {
+        $t = SupportTicket::with('user:id,name,email')->findOrFail($id);
+
+        return response()->json([
+            'ticket' => [
+                'id'         => $t->id,
+                'ticket_no'  => $t->ticket_no,
+                'subject'    => $t->subject,
+                'status'     => $t->status,
+                'name'       => $t->name,
+                'email'      => $t->email,
+                'phone'      => trim(($t->phone_code ? "+{$t->phone_code} " : '') . $t->phone),
+                'message'    => $t->message,
+                'attachments' => $t->attachments,
+                'source'     => $t->source,
+                'created_at' => optional($t->created_at)->toIso8601String(),
+                'user'       => $t->user ? [
+                    'id'    => $t->user->id,
+                    'name'  => $t->user->name,
+                    'email' => $t->user->email,
+                ] : null,
+            ],
+        ]);
+    }
+
+    public function updateSupportTicketStatus(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['open', 'pending', 'closed', 'resolved'])],
+        ]);
+
+        $t = SupportTicket::findOrFail($id);
+        $t->status = $data['status'];
+        $t->save();
+
+        return response()->json(['status' => 'success', 'ticket' => ['id' => $t->id, 'status' => $t->status]]);
     }
 }

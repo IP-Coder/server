@@ -20,12 +20,14 @@ class SupportTicket extends Model
         'status',
     ];
 
+    protected $table = 'support_tickets';
+    protected $guarded = [];
     protected $casts = [
-        'attachments' => 'array', // stores JSON array
+        'attachments' => 'array',
     ];
 
     public function user()
     {
-        return $this->belongsTo(\App\Models\User::class);
+        return $this->belongsTo(User::class);
     }
 }
