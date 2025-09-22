@@ -71,6 +71,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/users', [AdminController::class, 'listUsers']);
     Route::get('/users/{id}/trades', [AdminController::class, 'userTrades']);
     Route::post('/trades/{id}/close', [AdminController::class, 'closeTrade']);
+    Route::post('/users/{id}/updateStatus', [AdminController::class, 'updateUserStatus']);
     // Route::get('/users/{id}/transactions', [TransactionController::class, 'admintransections']);
     // Route::post('/transactions/{id}/status', [TransactionController::class, 'updateStatus']);
     Route::get('/users/{id}/transactions', [AdminController::class, 'userTransactions']);

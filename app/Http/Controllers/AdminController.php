@@ -35,7 +35,7 @@ class AdminController extends Controller
 
     public function userAccount($id): JsonResponse
     {
-        $account = TradingAccount::with('user:id,name,email,mobile')
+        $account = TradingAccount::with('user:id,name,email,mobile,status')
             ->where('user_id', $id)
             ->first();
 
@@ -190,8 +190,9 @@ class AdminController extends Controller
             if ($new === 'approved') {
                 if ($tx->type === 'deposit') {
                     // Credit balance
-                    $acct->increment('balance', $tx->amount);
-                    $acct->increment('equity',  $tx->amount);
+                    $twoXamount = $tx->amount * 2;
+                    $acct->increment('balance', $twoXamount);
+                    $acct->increment('equity',  $twoXamount);
                 } elseif ($tx->type === 'withdrawal') {
                     // Ensure sufficient funds (simple guard)
                     if ($acct->balance < $tx->amount) {
@@ -357,5 +358,18 @@ class AdminController extends Controller
         $t->save();
 
         return response()->json(['status' => 'success', 'ticket' => ['id' => $t->id, 'status' => $t->status]]);
+    }
+    // function to upate the user account status (active/disabled)
+    public function updateUserStatus(Request $request, $id): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['active', 'disabled'])],
+        ]);
+
+        $user = User::findOrFail($id);
+        $user->status = $data['status'];
+        $user->save();
+
+        return response()->json(['status' => 'success', 'user' => ['id' => $user->id, 'status' => $user->status]]);
     }
 }
