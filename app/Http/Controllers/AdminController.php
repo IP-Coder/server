@@ -14,6 +14,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use App\Models\KycSubmission; // ⬅️ NEW
 use App\Models\SupportTicket; // ⬅️ NEW
+use Illuminate\Support\Facades\Log;
 
 
 class AdminController extends Controller
@@ -279,6 +280,23 @@ class AdminController extends Controller
             ],
         ]);
     }
+    public function referralStats(Request $request, string $agentId): JsonResponse
+    {
+        Log::info("Fetching referral stats for agent: " . $agentId);
+        $query = User::with('tradingAccount:id,user_id,account_currency,balance,equity,used_margin')
+            ->select('id', 'name', 'email', 'mobile', 'account_type')
+            ->where('agent_code', $agentId); // ⬅️ add these
+
+        // Optional: only_live=1 dene par sirf LIVE users bhejo
+        if ($request->boolean('only_live')) {
+            $query->where('account_type', 'live');
+        }
+
+        $users = $query->get();
+
+        return response()->json(['users' => $users]);
+    }
+
     public function supportTickets(Request $request): JsonResponse
     {
         $status = $request->query('status'); // optional: open|pending|closed|resolved

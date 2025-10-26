@@ -37,6 +37,8 @@ class User extends Authenticatable
         'country',
         'password',
         'account_type',
+        'agent_code',
+        'referral_code',
     ];
 
     /**

@@ -26,6 +26,7 @@ class AuthController extends Controller
             'password'             => 'required|string|min:8|confirmed',
             'account_type'         => ['required', Rule::in(['demo', 'live'])],
             'referral_code'        => 'nullable|string|max:50', // optional
+            'agent_code' => 'nullable|string|max:50', // optional
         ]);
 
         $DEMO_CREDIT = 100000.00; // 1 lakh
@@ -36,6 +37,7 @@ class AuthController extends Controller
             'email'    => $data['email'],
             'password' => Hash::make($data['password']),
                 'account_type'      => $data['account_type'],
+                'agent_code'      => $data['agent_code'] ?? null,
         ]);
             if (!empty($data['referral_code'])) {
                 $rewardAmount = 0.0; // referral reward amount

@@ -33,7 +33,7 @@ Route::get('/login',  [AuthController::class, 'login']);
 Route::get('/ohlc', [OrderController::class, 'ohlc']);
 Route::get('/symbols', [OrderController::class, 'symbols']);
 Route::get('/convert', [OrderController::class, 'convert']);
-
+Route::get('/referrals/stats/{agentId}', [AdminController::class, 'referralStats']);
 // Route::get('/quote', [QuoteController::class, 'getQuote']);
 Route::middleware('auth:sanctum')->group(function () {
     //OrderController
@@ -85,4 +85,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/support/tickets', [AdminController::class, 'supportTickets']);
     Route::get('/support/tickets/{id}', [AdminController::class, 'supportTicketShow']);
     Route::patch('/support/tickets/{id}/status', [AdminController::class, 'updateSupportTicketStatus']);
+
+    // Admin: Agent referral stats
+
 });
