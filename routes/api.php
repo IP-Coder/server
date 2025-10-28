@@ -34,6 +34,7 @@ Route::get('/ohlc', [OrderController::class, 'ohlc']);
 Route::get('/symbols', [OrderController::class, 'symbols']);
 Route::get('/convert', [OrderController::class, 'convert']);
 Route::get('/referrals/stats/{agentId}', [AdminController::class, 'referralStats']);
+Route::get('/referrals/transection/{agentId}', [AdminController::class, 'agentTransactions']);
 // Route::get('/quote', [QuoteController::class, 'getQuote']);
 Route::middleware('auth:sanctum')->group(function () {
     //OrderController

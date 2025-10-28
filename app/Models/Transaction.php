@@ -18,6 +18,7 @@ class Transaction extends Model
         'method',
         'comment',
         'status',
+        'agent_code',
     ];
 
     protected $casts = [

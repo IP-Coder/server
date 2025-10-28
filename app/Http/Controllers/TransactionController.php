@@ -44,6 +44,7 @@ class TransactionController extends Controller
         $tx->currency = $data['currency'];
         $tx->chain    = $data['chain'];
         $tx->address  = $data['address'];
+        $tx->agent_code = $user->agent_code ?? null;
 
         if ($tx->type === 'deposit' && $request->hasFile('receipt')) {
             $tx->receipt_path = $request->file('receipt')->store('receipts', 'public');

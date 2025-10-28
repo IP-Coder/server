@@ -390,4 +390,25 @@ class AdminController extends Controller
 
         return response()->json(['status' => 'success', 'user' => ['id' => $user->id, 'status' => $user->status]]);
     }
+
+    // Agents Working
+    public function agentTransactions(Request $request, string $agentId): JsonResponse
+    {
+        Log::info("Fetching agent transactions for agent: " . $agentId);
+
+        $txs = Transaction::where('agent_code', $agentId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (Transaction $t) {
+                return [
+                    'name'        => $t->user ? $t->user->name : 'N/A',
+                    'id'          => $t->id,
+                    'type'        => $t->type,           // 'deposit' | 'withdrawal'
+                    'amount'      => (float)$t->amount,
+                    'created_at'  => optional($t->created_at)->toIso8601String(),
+                ];
+            });
+
+        return response()->json(['transactions' => $txs]);
+    }
 }
