@@ -411,4 +411,27 @@ class AdminController extends Controller
 
         return response()->json(['transactions' => $txs]);
     }
+
+    // Admin: Update User Balance
+    public function updateBalance(Request $request): JsonResponse
+    {
+        Log::info("Updating balance for user_id: " . $request->input('user_id'));
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:trading_accounts,user_id'],
+            'amount'  => ['required', 'numeric'],
+        ]);
+        $acct = TradingAccount::where('user_id', $data['user_id'])->first();
+        if (!$acct) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Trading account not found for this user.',
+            ], 422);
+        }
+        // Setting balance to the specified amount
+        $acct->balance = $data['amount'];
+        $acct->equity = $data['amount']; // Optionally update equity as well
+        $acct->save();
+
+        return response()->json(['status' => 'success', 'account' => ['user_id' => $acct->user_id, 'balance' => $acct->balance, 'equity' => $acct->equity]]);
+    }
 }

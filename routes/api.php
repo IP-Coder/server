@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->group(function () {
     Route::get('/support/tickets/{id}', [AdminController::class, 'supportTicketShow']);
     Route::patch('/support/tickets/{id}/status', [AdminController::class, 'updateSupportTicketStatus']);
 
-    // Admin: Agent referral stats
+    // Admin: Balance Update
+    Route::post('/balance/update', [AdminController::class, 'updateBalance']);
 
 });
