@@ -53,7 +53,7 @@ $codes = [
 
 ];
 $RAPID_HOST = 'insightsentry.p.rapidapi.com';
-$RAPID_KEY  = getenv('RAPIDAPI_KEY') ?: '408e348f18msh307e2c939cc6e59p1b7474jsnb50d80ee193a'; // key env me rakho
+$RAPID_KEY  = getenv('RAPIDAPI_KEY') ?: ''; // key sirf env (RAPIDAPI_KEY) me rakho - code me kabhi nahi
 $CHUNK_SIZE = 10;          // RapidAPI hard limit
 $SLEEP_BETWEEN_CHUNKS = 1; // seconds (rate-limit ke liye)
 
